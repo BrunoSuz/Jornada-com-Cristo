@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#19382f" />
+  <meta name="description" content="Aplicativo pessoal para devocional, EBD, leitura bíblica, prática diária, oração e revisão espiritual." />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Caminho Diário</title>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">CAMINHO DIÁRIO</p>
+      <h1 id="greeting">Bom dia</h1>
+      <p id="todayLabel" class="muted"></p>
+    </div>
+    <button id="installBtn" class="ghost hidden" type="button">Instalar app</button>
+  </header>
+
+  <main>
+    <section id="dashboard" class="view active">
+      <article class="hero-card">
+        <div>
+          <span class="pill">Progresso de hoje</span>
+          <h2><span id="progressCount">0</span> de 5 etapas</h2>
+          <p id="progressMessage">Comece com calma. Fidelidade vale mais que pressa.</p>
+        </div>
+        <div class="progress-ring" aria-label="Progresso diário">
+          <svg viewBox="0 0 120 120" role="img">
+            <circle class="ring-bg" cx="60" cy="60" r="50"></circle>
+            <circle id="ringValue" class="ring-value" cx="60" cy="60" r="50"></circle>
+          </svg>
+          <strong id="progressPercent">0%</strong>
+        </div>
+      </article>
+
+      <div class="grid two">
+        <article class="card task-card" data-task="devotional">
+          <div class="card-head"><span class="step">1</span><h3>Devocional</h3></div>
+          <p>Ore, leia e registre o que Deus falou com você.</p>
+          <button class="primary open-section" data-target="daily" data-focus="devotional">Iniciar</button>
+        </article>
+
+        <article class="card task-card" data-task="ebd">
+          <div class="card-head"><span class="step">2</span><h3>Estudo da EBD</h3></div>
+          <p>Avance na lição da semana e registre a aplicação.</p>
+          <button class="primary open-section" data-target="daily" data-focus="ebd">Continuar</button>
+        </article>
+
+        <article class="card task-card" data-task="bible">
+          <div class="card-head"><span class="step">3</span><h3>Leitura bíblica</h3></div>
+          <p id="nextReading">Registre o próximo capítulo da sua leitura.</p>
+          <button class="primary open-section" data-target="daily" data-focus="bible">Registrar</button>
+        </article>
+
+        <article class="card task-card accent" data-task="practice">
+          <div class="card-head"><span class="step">4</span><h3>Aplicação de hoje</h3></div>
+          <p id="practicePreview">Ainda não definida.</p>
+          <button class="primary open-section" data-target="daily" data-focus="practice">Definir prática</button>
+        </article>
+
+        <article class="card task-card" data-task="review">
+          <div class="card-head"><span class="step">5</span><h3>Revisão da noite</h3></div>
+          <p id="reviewPreview">Avalie o dia sem condenação e ajuste o amanhã.</p>
+          <button class="primary open-section" data-target="daily" data-focus="review">Revisar</button>
+        </article>
+
+        <article class="card prayer-highlight">
+          <div class="card-head"><span class="step">✦</span><h3>Oração</h3></div>
+          <p id="prayerPreview">Cadastre pessoas e motivos para não esquecer.</p>
+          <button class="secondary open-section" data-target="prayers">Ver lista</button>
+        </article>
+      </div>
+    </section>
+
+    <section id="daily" class="view">
+      <div class="section-title">
+        <div><p class="eyebrow">REGISTRO DO DIA</p><h2 id="dailyTitle"></h2></div>
+        <button id="saveDailyTop" class="primary" type="button">Salvar dia</button>
+      </div>
+
+      <div class="stack">
+        <article class="form-card" id="devotionalBlock">
+          <h3>1. Devocional</h3>
+          <label>Texto bíblico<input id="devotionalText" placeholder="Ex.: Eclesiastes 1" /></label>
+          <label>O que Deus falou comigo?<textarea id="devotionalMessage" rows="4"></textarea></label>
+          <label>O que preciso entregar a Deus?<textarea id="devotionalSurrender" rows="3"></textarea></label>
+          <label>Minha oração<textarea id="devotionalPrayer" rows="4"></textarea></label>
+          <label class="checkline"><input id="doneDevotional" type="checkbox" /> Concluí o devocional</label>
+        </article>
+
+        <article class="form-card" id="ebdBlock">
+          <h3>2. Estudo da EBD</h3>
+          <label>Título da lição<input id="ebdTitle" /></label>
+          <label>Tema estudado hoje<input id="ebdTopic" /></label>
+          <label>O que aprendi?<textarea id="ebdLearning" rows="4"></textarea></label>
+          <label>Como isso aparece na vida real?<textarea id="ebdApplication" rows="3"></textarea></label>
+          <label class="checkline"><input id="doneEbd" type="checkbox" /> Concluí o estudo da EBD</label>
+        </article>
+
+        <article class="form-card" id="bibleBlock">
+          <h3>3. Leitura bíblica</h3>
+          <div class="grid three">
+            <label>Livro<input id="bibleBook" placeholder="Eclesiastes" /></label>
+            <label>Capítulo<input id="bibleChapter" inputmode="numeric" /></label>
+            <label>Versículos<input id="bibleVerses" placeholder="1–18" /></label>
+          </div>
+          <label>O que o texto revela sobre Deus?<textarea id="bibleGod" rows="3"></textarea></label>
+          <label>O que chamou minha atenção?<textarea id="bibleInsight" rows="4"></textarea></label>
+          <label>Existe uma ordem, promessa, alerta ou exemplo?<textarea id="bibleDirection" rows="3"></textarea></label>
+          <label>Próxima leitura<input id="nextBibleReading" placeholder="Ex.: Eclesiastes 2" /></label>
+          <label class="checkline"><input id="doneBible" type="checkbox" /> Concluí a leitura bíblica</label>
+        </article>
+
+        <article class="form-card accent-border" id="practiceBlock">
+          <h3>4. Aplicação prática</h3>
+          <label>Uma verdade para lembrar<textarea id="truthToday" rows="2"></textarea></label>
+          <label>Uma atitude concreta para praticar<textarea id="actionToday" rows="3" placeholder="Escreva algo específico e realizável hoje."></textarea></label>
+          <label>Uma pessoa por quem vou orar<input id="personToday" /></label>
+          <label class="checkline"><input id="donePractice" type="checkbox" /> Defini minha prática de hoje</label>
+        </article>
+
+        <article class="form-card" id="reviewBlock">
+          <h3>5. Revisão da noite</h3>
+          <fieldset>
+            <legend>Pratiquei o que defini?</legend>
+            <div class="choice-row">
+              <label><input type="radio" name="reviewStatus" value="sim" /> Sim</label>
+              <label><input type="radio" name="reviewStatus" value="parcialmente" /> Parcialmente</label>
+              <label><input type="radio" name="reviewStatus" value="nao" /> Não</label>
+            </div>
+          </fieldset>
+          <label>O que aconteceu?<textarea id="reviewWhat" rows="3"></textarea></label>
+          <label>Onde me pareci com Cristo?<textarea id="reviewChrist" rows="3"></textarea></label>
+          <label>Onde preciso crescer?<textarea id="reviewGrowth" rows="3"></textarea></label>
+          <label>O que ajustarei amanhã?<textarea id="reviewTomorrow" rows="3"></textarea></label>
+          <label>Motivo de gratidão<textarea id="reviewGratitude" rows="2"></textarea></label>
+          <label class="checkline"><input id="doneReview" type="checkbox" /> Concluí a revisão da noite</label>
+        </article>
+
+        <button id="saveDailyBottom" class="primary large" type="button">Salvar registro do dia</button>
+      </div>
+    </section>
+
+    <section id="prayers" class="view">
+      <div class="section-title"><div><p class="eyebrow">INTERCESSÃO</p><h2>Lista de oração</h2></div></div>
+      <article class="form-card">
+        <div class="grid two">
+          <label>Nome<input id="prayerName" /></label>
+          <label>Categoria<select id="prayerCategory"><option>Família</option><option>Igreja</option><option>Enfermos</option><option>Afastados</option><option>Trabalho</option><option>Missões</option><option>Gratidão</option><option>Outro</option></select></label>
+        </div>
+        <label>Motivo<textarea id="prayerReason" rows="3"></textarea></label>
+        <button id="addPrayer" class="primary" type="button">Adicionar pedido</button>
+      </article>
+      <div id="prayerList" class="stack"></div>
+    </section>
+
+    <section id="history" class="view">
+      <div class="section-title"><div><p class="eyebrow">MEMÓRIA DA CAMINHADA</p><h2>Histórico</h2></div><button id="exportBtn" class="secondary" type="button">Exportar backup</button></div>
+      <div id="historyList" class="stack"></div>
+    </section>
+
+    <section id="weekly" class="view">
+      <div class="section-title"><div><p class="eyebrow">REVISÃO SEMANAL</p><h2>Consolidar a semana</h2></div></div>
+      <article class="form-card">
+        <label>Principal aprendizado<textarea id="weeklyLearning" rows="3"></textarea></label>
+        <label>Prática que consegui desenvolver<textarea id="weeklyPractice" rows="3"></textarea></label>
+        <label>Dificuldade que se repetiu<textarea id="weeklyDifficulty" rows="3"></textarea></label>
+        <label>Pessoa que preciso procurar<input id="weeklyPerson" /></label>
+        <label>Foco espiritual da próxima semana<textarea id="weeklyFocus" rows="3"></textarea></label>
+        <button id="saveWeekly" class="primary" type="button">Salvar revisão semanal</button>
+      </article>
+      <div id="weeklySummary" class="card"></div>
+    </section>
+
+    <section id="settings" class="view">
+      <div class="section-title"><div><p class="eyebrow">CONFIGURAÇÕES</p><h2>Seu ritmo</h2></div></div>
+      <article class="form-card">
+        <label>Seu nome<input id="userName" placeholder="Seu nome" autocomplete="name" /></label>
+        <label>Horário da rotina da manhã<input id="morningTime" type="time" value="06:00" /></label>
+        <label>Horário para lembrar a prática<input id="practiceTime" type="time" value="12:00" /></label>
+        <label>Horário da revisão noturna<input id="reviewTime" type="time" value="21:30" /></label>
+        <label class="checkline"><input id="darkMode" type="checkbox" /> Usar modo escuro</label>
+        <button id="saveSettings" class="primary" type="button">Salvar configurações</button>
+      </article>
+      <article class="card note">
+        <h3>Privacidade</h3>
+        <p>Seus registros ficam armazenados neste navegador. Faça backups periódicos antes de limpar dados do tablet ou trocar de aparelho.</p>
+      </article>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Navegação principal">
+    <button class="nav-btn active" data-view="dashboard">Hoje</button>
+    <button class="nav-btn" data-view="daily">Registro</button>
+    <button class="nav-btn" data-view="prayers">Oração</button>
+    <button class="nav-btn" data-view="history">Histórico</button>
+    <button class="nav-btn" data-view="weekly">Semana</button>
+    <button class="nav-btn" data-view="settings">Ajustes</button>
+  </nav>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>

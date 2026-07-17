@@ -1,0 +1,22 @@
+# Arquivos do sistema e editores
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Dependências, builds e relatórios locais
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+
+# Segredos e dados pessoais/locais
+.env
+.env.*
+!.env.example
+*.local
+*backup*.json
+dados-pessoais/
