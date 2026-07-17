@@ -18,7 +18,10 @@
       <h1 id="greeting">Bom dia</h1>
       <p id="todayLabel" class="muted"></p>
     </div>
-    <button id="installBtn" class="ghost hidden" type="button">Instalar app</button>
+    <div class="topbar-actions">
+      <span id="syncStatus" class="sync-status local" role="status">Somente neste aparelho</span>
+      <button id="installBtn" class="ghost hidden" type="button">Instalar app</button>
+    </div>
   </header>
 
   <main>
@@ -187,9 +190,31 @@
         <label class="checkline"><input id="darkMode" type="checkbox" /> Usar modo escuro</label>
         <button id="saveSettings" class="primary" type="button">Salvar configurações</button>
       </article>
+      <article class="form-card" id="accountCard">
+        <div id="signedOutAccount">
+          <h3>Sincronizar entre dispositivos</h3>
+          <p class="muted">Entre com a mesma conta no computador e no tablet. Seus registros continuarão disponíveis offline e serão sincronizados quando a conexão voltar.</p>
+          <label>E-mail<input id="authEmail" type="email" autocomplete="email" /></label>
+          <label>Senha<input id="authPassword" type="password" minlength="6" autocomplete="current-password" /></label>
+          <div class="item-actions">
+            <button id="signInBtn" class="primary" type="button">Entrar</button>
+            <button id="signUpBtn" class="secondary" type="button">Criar conta</button>
+          </div>
+          <p id="firebaseSetupNote" class="setup-note hidden">A sincronização ainda precisa ser configurada pelo responsável do aplicativo.</p>
+        </div>
+        <div id="signedInAccount" class="hidden">
+          <h3>Conta e sincronização</h3>
+          <p>Conectado como <strong id="accountEmail"></strong>.</p>
+          <div class="item-actions">
+            <button id="syncNowBtn" class="secondary" type="button">Sincronizar agora</button>
+            <button id="signOutBtn" class="secondary" type="button">Sair da conta</button>
+            <button id="deleteCloudBtn" class="danger" type="button">Excluir dados da nuvem</button>
+          </div>
+        </div>
+      </article>
       <article class="card note">
         <h3>Privacidade</h3>
-        <p>Seus registros ficam armazenados neste navegador. Faça backups periódicos antes de limpar dados do tablet ou trocar de aparelho.</p>
+        <p>Sem uma conta, os registros ficam somente neste navegador. Ao entrar, cada conta acessa apenas seus próprios dados, com cache local para uso offline.</p>
       </article>
     </section>
   </main>
@@ -204,6 +229,6 @@
   </nav>
 
   <div id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>

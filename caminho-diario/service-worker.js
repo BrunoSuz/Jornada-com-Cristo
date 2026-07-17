@@ -1,9 +1,10 @@
-const CACHE = 'caminho-diario-v2';
+const CACHE = 'caminho-diario-v3';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
+  './firebase-config.js',
   './manifest.webmanifest',
   './icon.svg',
   './icon-192.png',

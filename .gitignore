@@ -20,3 +20,4 @@ test-results/
 *.local
 *backup*.json
 dados-pessoais/
+.firebase-rules-analysis.md
