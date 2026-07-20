@@ -20,7 +20,8 @@ export const PRAYER_CATEGORIES = Object.freeze([
 
 export const DAY_TEXT_FIELDS = Object.freeze([
   'devotionalText', 'devotionalMessage', 'devotionalSurrender', 'devotionalPrayer',
-  'ebdTitle', 'ebdTopic', 'ebdLearning', 'ebdApplication',
+  'ebdTitle', 'ebdMainText', 'ebdWeekTheme', 'ebdTopic', 'ebdTopics', 'ebdLearning',
+  'ebdQuestions', 'ebdApplication', 'ebdDayPlan', 'ebdSaturdayReview', 'ebdSundaySummary',
   'bibleBook', 'bibleChapter', 'bibleVerses', 'bibleGod', 'bibleInsight',
   'bibleDirection', 'nextBibleReading', 'truthToday', 'actionToday',
   'personToday', 'reviewWhat', 'reviewChrist', 'reviewGrowth',
@@ -28,7 +29,7 @@ export const DAY_TEXT_FIELDS = Object.freeze([
 ]);
 
 export const DAY_CHECK_FIELDS = Object.freeze([
-  'doneDevotional', 'doneEbd', 'doneBible', 'donePractice', 'doneReview'
+  'doneDevotional', 'doneEbd', 'bibleChapterCompleted', 'doneBible', 'donePractice', 'doneReview'
 ]);
 
 export const WEEK_TEXT_FIELDS = Object.freeze([

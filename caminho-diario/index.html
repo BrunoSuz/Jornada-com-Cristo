@@ -101,9 +101,16 @@
         <article class="form-card" id="ebdBlock">
           <h3>2. Estudo da EBD</h3>
           <label>Título da lição<input id="ebdTitle" /></label>
+          <label>Texto principal (somente referência)<input id="ebdMainText" placeholder="Ex.: Romanos 12.1–2" /></label>
+          <label>Tema da semana<input id="ebdWeekTheme" /></label>
           <label>Tema estudado hoje<input id="ebdTopic" /></label>
+          <label>Tópicos estudados<textarea id="ebdTopics" rows="3"></textarea></label>
           <label>O que aprendi?<textarea id="ebdLearning" rows="4"></textarea></label>
+          <label>Dúvidas para pesquisar ou perguntar<textarea id="ebdQuestions" rows="3"></textarea></label>
           <label>Como isso aparece na vida real?<textarea id="ebdApplication" rows="3"></textarea></label>
+          <label>Divisão da lição por dias<textarea id="ebdDayPlan" rows="3"></textarea></label>
+          <label>Revisão para sábado<textarea id="ebdSaturdayReview" rows="3"></textarea></label>
+          <label>Resumo para domingo<textarea id="ebdSundaySummary" rows="3"></textarea></label>
           <label class="checkline"><input id="doneEbd" type="checkbox" /> Concluí o estudo da EBD</label>
         </article>
 
@@ -118,6 +125,7 @@
           <label>O que chamou minha atenção?<textarea id="bibleInsight" rows="4"></textarea></label>
           <label>Existe uma ordem, promessa, alerta ou exemplo?<textarea id="bibleDirection" rows="3"></textarea></label>
           <label>Próxima leitura<input id="nextBibleReading" placeholder="Ex.: Eclesiastes 2" /></label>
+          <label class="checkline"><input id="bibleChapterCompleted" type="checkbox" /> Marquei este capítulo como concluído</label>
           <label class="checkline"><input id="doneBible" type="checkbox" /> Concluí a leitura bíblica</label>
         </article>
 
@@ -176,6 +184,7 @@
           <label>Buscar<input id="historySearch" type="search" placeholder="Devocional, leitura ou prática" /></label>
           <label>De<input id="historyFrom" type="date" /></label>
           <label>Até<input id="historyTo" type="date" /></label>
+          <label>Tipo<select id="historyType"><option value="all">Todos</option><option value="devotional">Devocional</option><option value="ebd">EBD</option><option value="bible">Leitura bíblica</option><option value="practice">Aplicação</option><option value="review">Revisão</option></select></label>
         </div>
         <div class="filter-bar">
           <label>Como importar<select id="importMode"><option value="merge">Mesclar versões mais recentes</option><option value="replace">Substituir dados locais</option></select></label>

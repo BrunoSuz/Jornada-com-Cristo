@@ -33,6 +33,7 @@ let syncNeedsPull = false;
 let toastTimer = null;
 let undoTimer = null;
 let reloadingForUpdate = false;
+let editingDayKey = todayKey();
 
 function showToast(text, { persistent = false } = {}) {
   clearTimeout(toastTimer);
@@ -62,6 +63,7 @@ function formatDate(date = new Date()) {
 }
 
 function currentDay() { return state.days[todayKey()] || {}; }
+function editingDay() { return state.days[editingDayKey] || {}; }
 
 function applyTheme() {
   const theme = state.settings.theme || 'system';
@@ -78,11 +80,11 @@ function loadHeader() {
 }
 
 function loadDayForm() {
-  const day = currentDay();
+  const day = editingDay();
   DAY_TEXT_FIELDS.forEach(id => { el(id).value = day[id] || ''; });
   DAY_CHECK_FIELDS.forEach(id => { el(id).checked = Boolean(day[id]); });
   document.querySelectorAll('input[name="reviewStatus"]').forEach(input => { input.checked = day.reviewStatus === input.value; });
-  el('dailyTitle').textContent = formatDate();
+  el('dailyTitle').textContent = new Date(`${editingDayKey}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
 }
 
 function loadSettings() {
@@ -124,7 +126,7 @@ function navigate(view, focusBlock = null) {
 
 function renderDashboard() {
   const day = currentDay();
-  const checks = DAY_CHECK_FIELDS;
+  const checks = ['doneDevotional', 'doneEbd', 'doneBible', 'donePractice', 'doneReview'];
   const count = checks.filter(key => day[key]).length;
   const percent = count * 20;
   el('progressCount').textContent = count;
@@ -138,19 +140,19 @@ function renderDashboard() {
   el('practicePreview').textContent = day.actionToday || 'Ainda não definida.';
   el('reviewPreview').textContent = day.reviewStatus ? `Resultado: ${day.reviewStatus}.` : 'Avalie o dia sem condenação e ajuste o amanhã.';
   const activePrayers = state.prayers.filter(prayer => prayer.status === 'active');
-  el('prayerPreview').textContent = activePrayers.length ? `${activePrayers.length} pedido(s) ativo(s) na sua lista.` : 'Cadastre pessoas e motivos para não esquecer.';
+  el('prayerPreview').textContent = activePrayers.length ? `Ore hoje por ${activePrayers.slice(0, 3).map(prayer => prayer.name).join(', ')}${activePrayers.length > 3 ? ` e mais ${activePrayers.length - 3}` : ''}.` : 'Cadastre pessoas e motivos para não esquecer.';
   const next = Object.entries(map).find(([, key]) => !day[key])?.[0] || 'review';
   el('continueBtn').dataset.focus = next;
   el('continueBtn').textContent = count === 5 ? 'Rever o dia' : 'Continuar de onde parei';
 }
 
 async function saveDay({ silent = false } = {}) {
-  const payload = { date: todayKey(), updatedAt: nowIso() };
+  const payload = { date: editingDayKey, updatedAt: nowIso() };
   DAY_TEXT_FIELDS.forEach(id => { payload[id] = el(id).value; });
   DAY_CHECK_FIELDS.forEach(id => { payload[id] = el(id).checked; });
   payload.reviewStatus = document.querySelector('input[name="reviewStatus"]:checked')?.value || '';
   try {
-    state.days[todayKey()] = await set(activeScope, RECORD_KINDS.DAY, todayKey(), payload);
+    state.days[editingDayKey] = await set(activeScope, RECORD_KINDS.DAY, editingDayKey, payload);
     renderDashboard();
     requestSync();
     el('draftStatus').textContent = `Rascunho salvo às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
@@ -214,22 +216,24 @@ function renderPrayers() {
     const title = document.createElement('h3'); title.textContent = prayer.name;
     const reason = document.createElement('p'); reason.textContent = prayer.reason;
     const last = document.createElement('p'); last.className = 'muted'; last.textContent = `Última oração: ${prayer.lastPrayed ? new Date(prayer.lastPrayed).toLocaleString('pt-BR') : 'ainda não registrada'}`;
+    const answer = document.createElement('p'); answer.className = prayer.answer ? '' : 'hidden'; answer.textContent = prayer.answer ? `Resposta recebida: ${prayer.answer}` : '';
     const actions = document.createElement('div'); actions.className = 'item-actions';
     actions.append(
       prayerButton('Orei hoje', 'secondary', () => updatePrayer(prayer, { lastPrayed: nowIso() }, 'Oração registrada.')),
-      prayerButton(prayer.status === 'active' ? 'Marcar respondido' : 'Reabrir', 'secondary', () => updatePrayer(prayer, { status: prayer.status === 'active' ? 'answered' : 'active', answeredAt: prayer.status === 'active' ? nowIso() : null })),
+      prayerButton(prayer.status === 'active' ? 'Marcar respondido' : 'Reabrir', 'secondary', () => { const answering = prayer.status === 'active'; const response = answering ? prompt('Como esta oração foi respondida? (opcional)', prayer.answer || '') : ''; updatePrayer(prayer, { status: answering ? 'answered' : 'active', answeredAt: answering ? nowIso() : null, answer: response || '' }); }),
       prayerButton(prayer.status === 'archived' ? 'Desarquivar' : 'Arquivar', 'secondary', () => updatePrayer(prayer, { status: prayer.status === 'archived' ? 'active' : 'archived', archivedAt: prayer.status === 'archived' ? null : nowIso() })),
       prayerButton('Excluir', 'danger', () => removePrayerWithUndo(prayer))
     );
-    item.append(category, title, reason, last, actions); box.append(item);
+    item.append(category, title, reason, answer, last, actions); box.append(item);
   });
 }
 
 function renderHistory() {
   const box = el('historyList'); box.replaceChildren();
   const query = el('historySearch').value.trim().toLocaleLowerCase('pt-BR');
-  const from = el('historyFrom').value; const to = el('historyTo').value;
-  const entries = Object.values(state.days).sort((a, b) => b.date.localeCompare(a.date)).filter(day => (!from || day.date >= from) && (!to || day.date <= to) && (!query || JSON.stringify(day).toLocaleLowerCase('pt-BR').includes(query)));
+  const from = el('historyFrom').value; const to = el('historyTo').value; const type = el('historyType').value;
+  const typeFields = { devotional: ['devotionalText', 'devotionalMessage'], ebd: ['ebdTitle', 'ebdLearning'], bible: ['bibleBook', 'bibleInsight'], practice: ['actionToday', 'truthToday'], review: ['reviewStatus', 'reviewWhat'] }[type];
+  const entries = Object.values(state.days).sort((a, b) => b.date.localeCompare(a.date)).filter(day => (!from || day.date >= from) && (!to || day.date <= to) && (!typeFields || typeFields.some(field => day[field])) && (!query || JSON.stringify(day).toLocaleLowerCase('pt-BR').includes(query)));
   if (!entries.length) { const empty = document.createElement('article'); empty.className = 'card'; const text = document.createElement('p'); text.className = 'muted'; text.textContent = query || from || to ? 'Nenhum registro corresponde aos filtros.' : 'Nenhum registro salvo ainda.'; empty.append(text); box.append(empty); return; }
   entries.forEach(day => {
     const article = document.createElement('article'); article.className = 'history-item';
@@ -237,7 +241,7 @@ function renderHistory() {
     const content = document.createElement('div'); content.className = 'history-content';
     const fields = [day.devotionalText && `Devocional: ${day.devotionalText}`, day.devotionalMessage && `Reflexão: ${day.devotionalMessage}`, day.ebdTitle && `EBD: ${day.ebdTitle}`, day.bibleBook && `Leitura: ${day.bibleBook} ${day.bibleChapter}`, day.bibleInsight && `Observação: ${day.bibleInsight}`, day.actionToday && `Prática: ${day.actionToday}`, day.reviewStatus && `Revisão: ${day.reviewStatus}`, day.reviewGratitude && `Gratidão: ${day.reviewGratitude}`].filter(Boolean);
     fields.forEach(value => { const paragraph = document.createElement('p'); paragraph.textContent = value; content.append(paragraph); });
-    const actions = document.createElement('div'); actions.className = 'item-actions'; actions.append(prayerButton('Editar este dia', 'secondary', () => { if (day.date !== todayKey()) { showToast('A edição de dias anteriores será adicionada em uma próxima etapa.'); return; } navigate('daily', 'devotional'); }), prayerButton('Excluir registro', 'danger', async () => { if (!confirm(`Excluir o registro de ${day.date}?`)) return; await markDeleted(activeScope, RECORD_KINDS.DAY, day.date); delete state.days[day.date]; requestSync(); renderHistory(); renderDashboard(); }));
+    const actions = document.createElement('div'); actions.className = 'item-actions'; actions.append(prayerButton('Editar este dia', 'secondary', () => { editingDayKey = day.date; loadDayForm(); navigate('daily', 'devotional'); }), prayerButton('Excluir registro', 'danger', async () => { if (!confirm(`Excluir o registro de ${day.date}?`)) return; await markDeleted(activeScope, RECORD_KINDS.DAY, day.date); delete state.days[day.date]; if (editingDayKey === day.date) editingDayKey = todayKey(); requestSync(); renderHistory(); renderDashboard(); }));
     content.append(actions); details.append(summary, content); article.append(details); box.append(article);
   });
 }
@@ -420,15 +424,15 @@ function setupServiceWorker() {
 }
 
 function bindEvents() {
-  document.querySelectorAll('.nav-btn').forEach(button => button.addEventListener('click', () => navigate(button.dataset.view)));
-  document.querySelectorAll('.open-section').forEach(button => button.addEventListener('click', () => navigate(button.dataset.target, button.dataset.focus)));
-  el('continueBtn').addEventListener('click', () => navigate('daily', el('continueBtn').dataset.focus));
+  document.querySelectorAll('.nav-btn').forEach(button => button.addEventListener('click', () => { if (button.dataset.view === 'daily') { editingDayKey = todayKey(); loadDayForm(); } navigate(button.dataset.view); }));
+  document.querySelectorAll('.open-section').forEach(button => button.addEventListener('click', () => { if (button.dataset.target === 'daily') { editingDayKey = todayKey(); loadDayForm(); } navigate(button.dataset.target, button.dataset.focus); }));
+  el('continueBtn').addEventListener('click', () => { editingDayKey = todayKey(); loadDayForm(); navigate('daily', el('continueBtn').dataset.focus); });
   el('saveDailyTop').addEventListener('click', () => saveDay()); el('saveDailyBottom').addEventListener('click', () => saveDay());
   [...DAY_TEXT_FIELDS, ...DAY_CHECK_FIELDS].forEach(id => el(id).addEventListener(id.startsWith('done') ? 'change' : 'input', autosaveDay));
   document.querySelectorAll('input[name="reviewStatus"]').forEach(input => input.addEventListener('change', autosaveDay));
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') autosaveDay.flush(); });
   el('addPrayer').addEventListener('click', addPrayer); el('prayerSearch').addEventListener('input', renderPrayers); el('prayerFilter').addEventListener('change', renderPrayers);
-  el('historySearch').addEventListener('input', renderHistory); el('historyFrom').addEventListener('change', renderHistory); el('historyTo').addEventListener('change', renderHistory);
+  el('historySearch').addEventListener('input', renderHistory); el('historyFrom').addEventListener('change', renderHistory); el('historyTo').addEventListener('change', renderHistory); el('historyType').addEventListener('change', renderHistory);
   el('saveWeekly').addEventListener('click', async () => { const data = {}; WEEK_TEXT_FIELDS.forEach(id => { data[id] = el(id).value; }); const payload = normalizeWeek(weekKey(), { ...data, week: weekKey(), savedAt: state.weeks[weekKey()]?.savedAt || nowIso(), updatedAt: nowIso() }); state.weeks[weekKey()] = await set(activeScope, RECORD_KINDS.WEEK, weekKey(), payload); requestSync(); showToast('Revisão semanal salva.'); });
   el('saveSettings').addEventListener('click', async () => { const payload = normalizeSettings({ name: el('userName').value, morningTime: el('morningTime').value, practiceTime: el('practiceTime').value, reviewTime: el('reviewTime').value, theme: el('themeMode').value, updatedAt: nowIso() }); state.settings = await set(activeScope, RECORD_KINDS.SETTINGS, 'profile', payload); requestSync(); loadSettings(); loadHeader(); showToast('Configurações salvas.'); });
   el('themeMode').addEventListener('change', () => { state.settings.theme = el('themeMode').value; applyTheme(); });

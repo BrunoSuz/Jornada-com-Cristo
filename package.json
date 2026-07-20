@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/*.test.js",
+    "test": "node tests/core.test.js",
     "check": "node --check caminho-diario/app.js && node --check caminho-diario/service-worker.js"
   }
 }

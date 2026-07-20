@@ -5,10 +5,16 @@ import { chooseNewest, nextRetryDelay, operationKey, shouldApplyRealtime } from 
 import { isoWeekKey, localDateKey } from '../caminho-diario/js/utils.js';
 
 test('normaliza e limita payload diário', () => {
-  const day = normalizeDay('2026-07-20', { devotionalText: '  João 1  ', reviewStatus: 'invalido', doneBible: 1 });
+  const day = normalizeDay('2026-07-20', { devotionalText: '  João 1  ', reviewStatus: 'invalido', doneBible: 1, bibleChapterCompleted: true, ebdQuestions: 'Pesquisar contexto' });
   assert.equal(day.devotionalText, 'João 1');
   assert.equal(day.reviewStatus, '');
   assert.equal(day.doneBible, true);
+  assert.equal(day.bibleChapterCompleted, true);
+  assert.equal(day.ebdQuestions, 'Pesquisar contexto');
+});
+
+test('rejeita backup que não é objeto', () => {
+  assert.throws(() => validateBackup([]), /objeto JSON/);
 });
 
 test('normaliza oração legada sem perder status', () => {
