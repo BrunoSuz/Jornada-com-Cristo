@@ -1,15 +1,17 @@
-const CACHE = 'caminho-diario-v3';
+const CACHE = 'caminho-diario-v5';
+const SUPABASE_MODULE = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.7/dist/umd/supabase.min.js';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
-  './firebase-config.js',
+  './supabase-config.js',
   './manifest.webmanifest',
   './icon.svg',
   './icon-192.png',
   './icon-512.png',
-  './icon-maskable-512.png'
+  './icon-maskable-512.png',
+  SUPABASE_MODULE
 ];
 
 self.addEventListener('install', event => {

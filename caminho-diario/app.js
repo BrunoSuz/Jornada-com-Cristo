@@ -1,11 +1,14 @@
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
-import { createUserWithEmailAndPassword, getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
-import { collection, deleteDoc, doc, enableNetwork, getDoc, getDocs, getFirestore, initializeFirestore, onSnapshot, persistentLocalCache, persistentMultipleTabManager, serverTimestamp, setDoc, Timestamp, waitForPendingWrites, writeBatch } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
-import { firebaseConfig } from './firebase-config.js';
+import { supabaseConfig } from './supabase-config.js';
+
+const { createClient } = window.supabase || {};
 
 const APP_KEY = 'caminhoDiarioDataV1';
 const MIGRATION_OWNER_KEY = 'caminhoDiarioMigrationOwnerV1';
-const todayKey = () => new Date().toISOString().slice(0,10);
+const todayKey = () => {
+  const date=new Date();
+  const year=date.getFullYear(),month=String(date.getMonth()+1).padStart(2,'0'),day=String(date.getDate()).padStart(2,'0');
+  return `${year}-${month}-${day}`;
+};
 const weekKey = () => {
   const d = new Date();
   const copy = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -15,20 +18,19 @@ const weekKey = () => {
   const week = Math.ceil((((copy-yearStart)/86400000)+1)/7);
   return `${copy.getUTCFullYear()}-W${String(week).padStart(2,'0')}`;
 };
-const defaultState = { settings:{name:'',morningTime:'06:00',practiceTime:'12:00',reviewTime:'21:30',darkMode:false}, days:{}, prayers:[], weeks:{} };
+const defaultState = { settings:{name:'',morningTime:'06:00',practiceTime:'12:00',reviewTime:'21:30',darkMode:false}, days:{}, prayers:[], weeks:{}, deletions:[] };
 let activeStorageKey = APP_KEY;
 let state = loadState();
 let deferredPrompt = null;
-let auth = null;
-let db = null;
+let supabase = null;
 let currentUser = null;
-let unsubscribeCloud = [];
+let cloudChannel = null;
 let syncConfigured = false;
 
 function loadState(key=activeStorageKey){
   try {
     const saved=JSON.parse(localStorage.getItem(key) || '{}');
-    return {...structuredClone(defaultState),...saved,settings:{...defaultState.settings,...(saved.settings||{})},days:saved.days||{},prayers:saved.prayers||[],weeks:saved.weeks||{}};
+    return {...structuredClone(defaultState),...saved,settings:{...defaultState.settings,...(saved.settings||{})},days:saved.days||{},prayers:saved.prayers||[],weeks:saved.weeks||{},deletions:Array.isArray(saved.deletions)?saved.deletions:[]};
   }
   catch { return structuredClone(defaultState); }
 }
@@ -110,7 +112,7 @@ function renderPrayers(){
     item.innerHTML=`<p class="eyebrow">${escapeHtml(p.category)}</p><h3>${escapeHtml(p.name)}</h3><p>${escapeHtml(p.reason)}</p><p class="muted">Última oração: ${p.lastPrayed?new Date(p.lastPrayed).toLocaleString('pt-BR'):'ainda não registrada'}</p><div class="item-actions"><button class="secondary pray">Orei hoje</button><button class="secondary toggle">${p.done?'Reabrir':'Marcar respondido'}</button><button class="danger remove">Excluir</button></div>`;
     item.querySelector('.pray').onclick=()=>{p.lastPrayed=new Date().toISOString();p.updatedAt=new Date().toISOString();saveState();syncPrayer(p);renderPrayers();showToast('Oração registrada.');};
     item.querySelector('.toggle').onclick=()=>{p.done=!p.done;p.updatedAt=new Date().toISOString();saveState();syncPrayer(p);renderPrayers();renderDashboard();};
-    item.querySelector('.remove').onclick=()=>{state.prayers=state.prayers.filter(x=>x.id!==p.id);saveState();removeCloudDoc('prayers',p.id);renderPrayers();renderDashboard();};
+    item.querySelector('.remove').onclick=()=>{state.prayers=state.prayers.filter(x=>x.id!==p.id);queueCloudDeletion('prayer',p.id);saveState();flushPendingDeletions().catch(handleSyncError);renderPrayers();renderDashboard();};
     box.appendChild(item);
   });
 }
@@ -160,12 +162,12 @@ function escapeHtml(s=''){ return s.replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt
 function setSyncStatus(kind,text){
   const status=el('syncStatus');status.className=`sync-status ${kind}`;status.textContent=text;
 }
-function firebaseReady(){ return ['apiKey','authDomain','projectId','appId'].every(key=>firebaseConfig[key]); }
+function supabaseReady(){ return Boolean(createClient&&supabaseConfig.url&&supabaseConfig.publishableKey); }
 function timestampMillis(value){
   if(value?.toMillis)return value.toMillis();
   const parsed=Date.parse(value||0);return Number.isNaN(parsed)?0:parsed;
 }
-function timestampIso(value){ return value?.toDate?value.toDate().toISOString():(value||null); }
+function timestampIso(value){ return value||null; }
 function normalizeDay(id,data={}){
   const normalized={date:data.date||id,updatedAt:timestampIso(data.updatedAt)||new Date().toISOString(),reviewStatus:data.reviewStatus||''};
   fieldIds.forEach(key=>normalized[key]=typeof data[key]==='string'?data[key]:'');
@@ -183,42 +185,55 @@ function normalizeWeek(id,data={}){
 function normalizeSettings(data={}){
   return {...defaultState.settings,name:data.name||'',morningTime:data.morningTime||'06:00',practiceTime:data.practiceTime||'12:00',reviewTime:data.reviewTime||'21:30',darkMode:Boolean(data.darkMode),updatedAt:timestampIso(data.updatedAt)||new Date().toISOString()};
 }
-function userCollection(name){ return collection(db,'users',currentUser.uid,name); }
-function userDoc(name,id){ return doc(db,'users',currentUser.uid,name,id); }
 function markSaving(){ if(currentUser)setSyncStatus(navigator.onLine?'saving':'offline',navigator.onLine?'Salvando…':'Offline · alterações na fila'); }
 function handleSyncError(error){
   console.error('Falha de sincronização:',error);
   setSyncStatus(navigator.onLine?'error':'offline',navigator.onLine?'Erro ao sincronizar':'Offline · alterações na fila');
 }
 async function syncDay(id,data){
-  if(!currentUser)return;markSaving();
-  const clean=normalizeDay(id,data);await setDoc(userDoc('days',id),{...clean,updatedAt:serverTimestamp()}).catch(handleSyncError);
+  await syncRecord('day',id,normalizeDay(id,data));
 }
 async function syncPrayer(data){
-  if(!currentUser)return;markSaving();
-  const clean=normalizePrayer(data.id,data);
-  await setDoc(userDoc('prayers',data.id),{...clean,createdAt:Timestamp.fromDate(new Date(clean.createdAt)),updatedAt:serverTimestamp(),lastPrayed:clean.lastPrayed?Timestamp.fromDate(new Date(clean.lastPrayed)):null}).catch(handleSyncError);
+  await syncRecord('prayer',data.id,normalizePrayer(data.id,data));
 }
 async function syncWeek(id,data){
-  if(!currentUser)return;markSaving();
-  const clean=normalizeWeek(id,data);await setDoc(userDoc('weeks',id),{...clean,savedAt:Timestamp.fromDate(new Date(clean.savedAt)),updatedAt:serverTimestamp()}).catch(handleSyncError);
+  await syncRecord('week',id,normalizeWeek(id,data));
 }
 async function syncSettings(){
-  if(!currentUser)return;markSaving();
-  const clean=normalizeSettings(state.settings);await setDoc(userDoc('settings','profile'),{...clean,updatedAt:serverTimestamp()}).catch(handleSyncError);
+  await syncRecord('settings','profile',normalizeSettings(state.settings));
 }
-async function removeCloudDoc(group,id){
-  if(!currentUser)return;markSaving();await deleteDoc(userDoc(group,id)).catch(handleSyncError);
+function queueCloudDeletion(kind,id){
+  const existing=state.deletions.find(item=>item.kind===kind&&item.id===id);
+  if(existing)existing.deletedAt=new Date().toISOString();
+  else state.deletions.push({kind,id,deletedAt:new Date().toISOString()});
+}
+async function flushPendingDeletions(){
+  if(!currentUser||!supabase||!navigator.onLine||!state.deletions.length)return;
+  markSaving();
+  for(const pending of [...state.deletions]){
+    const {error}=await supabase.from('caminho_diario_records').delete().eq('user_id',currentUser.id).eq('kind',pending.kind).eq('record_id',pending.id);
+    if(error)throw error;
+    state.deletions=state.deletions.filter(item=>!(item.kind===pending.kind&&item.id===pending.id));
+    saveState();
+  }
+  setSyncStatus('synced','Sincronizado');
+}
+async function syncRecord(kind,id,payload){
+  if(!currentUser||!navigator.onLine)return;markSaving();
+  const {error}=await supabase.from('caminho_diario_records').upsert({user_id:currentUser.id,kind,record_id:id,payload,updated_at:payload.updatedAt||new Date().toISOString()},{onConflict:'user_id,kind,record_id'});
+  if(error)handleSyncError(error);else setSyncStatus('synced','Sincronizado');
 }
 
 async function mergeAndMigrate(){
   setSyncStatus('saving','Preparando sincronização…');
-  const [daysSnap,prayersSnap,weeksSnap,settingsSnap]=await Promise.all([
-    getDocs(userCollection('days')),getDocs(userCollection('prayers')),getDocs(userCollection('weeks')),getDoc(userDoc('settings','profile'))
-  ]);
-  const cloudDays=new Map(daysSnap.docs.map(item=>[item.id,item.data()]));
-  const cloudPrayers=new Map(prayersSnap.docs.map(item=>[item.id,item.data()]));
-  const cloudWeeks=new Map(weeksSnap.docs.map(item=>[item.id,item.data()]));
+  await flushPendingDeletions();
+  const {data:rows,error}=await supabase.from('caminho_diario_records').select('kind,record_id,payload,updated_at');
+  if(error)throw error;
+  const records=rows||[];
+  const cloudDays=new Map(records.filter(r=>r.kind==='day').map(r=>[r.record_id,{...r.payload,updatedAt:r.updated_at}]));
+  const cloudPrayers=new Map(records.filter(r=>r.kind==='prayer').map(r=>[r.record_id,{...r.payload,updatedAt:r.updated_at}]));
+  const cloudWeeks=new Map(records.filter(r=>r.kind==='week').map(r=>[r.record_id,{...r.payload,updatedAt:r.updated_at}]));
+  const settingsRow=records.find(r=>r.kind==='settings'&&r.record_id==='profile');
   for(const [id,local] of Object.entries(state.days)){
     const remote=cloudDays.get(id);
     if(!remote||timestampMillis(local.updatedAt)>timestampMillis(remote.updatedAt))await syncDay(id,local);
@@ -238,8 +253,8 @@ async function mergeAndMigrate(){
     else state.weeks[id]=normalizeWeek(id,remote);
   }
   cloudWeeks.forEach((data,id)=>{if(!state.weeks[id])state.weeks[id]=normalizeWeek(id,data);});
-  if(settingsSnap.exists()){
-    const remote=settingsSnap.data();
+  if(settingsRow){
+    const remote={...settingsRow.payload,updatedAt:settingsRow.updated_at};
     if(timestampMillis(state.settings.updatedAt)>timestampMillis(remote.updatedAt))await syncSettings();
     else state.settings=normalizeSettings(remote);
   }else if(state.settings.name||state.settings.updatedAt){ await syncSettings(); }
@@ -247,22 +262,21 @@ async function mergeAndMigrate(){
 }
 
 function listenToCloud(){
-  const listen=(group,apply)=>onSnapshot(userCollection(group),{includeMetadataChanges:true},snapshot=>{
-    snapshot.docChanges().forEach(change=>apply(change.type,change.doc.id,change.doc.data()));
-    saveState();refreshAll();
-    const pending=snapshot.metadata.hasPendingWrites;
-    setSyncStatus(pending?'saving':snapshot.metadata.fromCache?'offline':'synced',pending?'Salvando…':snapshot.metadata.fromCache?'Offline · dados locais':'Sincronizado');
-  },handleSyncError);
-  unsubscribeCloud.push(listen('days',(type,id,data)=>{if(type==='removed')delete state.days[id];else state.days[id]=normalizeDay(id,data);}));
-  unsubscribeCloud.push(listen('prayers',(type,id,data)=>{state.prayers=state.prayers.filter(item=>item.id!==id);if(type!=='removed')state.prayers.push(normalizePrayer(id,data));}));
-  unsubscribeCloud.push(listen('weeks',(type,id,data)=>{if(type==='removed')delete state.weeks[id];else state.weeks[id]=normalizeWeek(id,data);}));
-  unsubscribeCloud.push(onSnapshot(userDoc('settings','profile'),{includeMetadataChanges:true},snapshot=>{if(snapshot.exists()){state.settings=normalizeSettings(snapshot.data());saveState();loadSettings();loadHeader();}},handleSyncError));
+  cloudChannel=supabase.channel(`records:${currentUser.id}`).on('postgres_changes',{event:'*',schema:'public',table:'caminho_diario_records',filter:`user_id=eq.${currentUser.id}`},payload=>{
+    const row=payload.new?.kind?payload.new:payload.old;if(!row)return;
+    const removed=payload.eventType==='DELETE';
+    if(row.kind==='day'){if(removed)delete state.days[row.record_id];else state.days[row.record_id]=normalizeDay(row.record_id,{...row.payload,updatedAt:row.updated_at});}
+    if(row.kind==='prayer'){state.prayers=state.prayers.filter(item=>item.id!==row.record_id);if(!removed)state.prayers.push(normalizePrayer(row.record_id,{...row.payload,updatedAt:row.updated_at}));}
+    if(row.kind==='week'){if(removed)delete state.weeks[row.record_id];else state.weeks[row.record_id]=normalizeWeek(row.record_id,{...row.payload,updatedAt:row.updated_at});}
+    if(row.kind==='settings'&&!removed)state.settings=normalizeSettings({...row.payload,updatedAt:row.updated_at});
+    saveState();refreshAll();setSyncStatus('synced','Sincronizado');
+  }).subscribe();
 }
-function stopCloudListeners(){ unsubscribeCloud.forEach(stop=>stop());unsubscribeCloud=[]; }
+function stopCloudListeners(){ if(cloudChannel&&supabase)supabase.removeChannel(cloudChannel);cloudChannel=null; }
 function switchToUserStorage(user){
-  const userKey=`${APP_KEY}:${user.uid}`;
+  const userKey=`${APP_KEY}:${user.id}`;
   if(!localStorage.getItem(userKey)&&localStorage.getItem(APP_KEY)&&!localStorage.getItem(MIGRATION_OWNER_KEY)){
-    localStorage.setItem(userKey,localStorage.getItem(APP_KEY));localStorage.setItem(MIGRATION_OWNER_KEY,user.uid);localStorage.removeItem(APP_KEY);
+    localStorage.setItem(userKey,localStorage.getItem(APP_KEY));localStorage.setItem(MIGRATION_OWNER_KEY,user.id);localStorage.removeItem(APP_KEY);
   }
   activeStorageKey=userKey;state=loadState();refreshAll();
 }
@@ -271,54 +285,53 @@ function showAccount(user){
   el('accountEmail').textContent=user?.email||'';
 }
 function authMessage(error){
-  const known={'auth/invalid-credential':'E-mail ou senha inválidos.','auth/email-already-in-use':'Este e-mail já possui uma conta.','auth/weak-password':'Use uma senha mais forte, com pelo menos 6 caracteres.','auth/invalid-email':'Informe um e-mail válido.','auth/network-request-failed':'Sem conexão. Tente novamente quando estiver online.'};
-  return known[error.code]||'Não foi possível concluir. Verifique os dados e tente novamente.';
+  const message=(error?.message||'').toLowerCase();
+  if(message.includes('invalid login'))return 'E-mail ou senha inválidos.';
+  if(message.includes('already registered'))return 'Este e-mail já possui uma conta.';
+  if(message.includes('password'))return 'Use uma senha mais forte, com pelo menos 6 caracteres.';
+  return navigator.onLine?'Não foi possível concluir. Verifique os dados e tente novamente.':'Sem conexão. Tente novamente quando estiver online.';
 }
 async function submitAuth(create=false){
-  if(!syncConfigured||!auth){showToast('A sincronização Firebase ainda não foi configurada.');return;}
+  if(!syncConfigured||!supabase){showToast('A sincronização Supabase ainda não foi configurada.');return;}
   const email=el('authEmail').value.trim(),password=el('authPassword').value;
   if(!email||password.length<6){showToast('Informe um e-mail e uma senha com pelo menos 6 caracteres.');return;}
-  try{if(create)await createUserWithEmailAndPassword(auth,email,password);else await signInWithEmailAndPassword(auth,email,password);el('authPassword').value='';}
+  try{const {data,error}=create?await supabase.auth.signUp({email,password}):await supabase.auth.signInWithPassword({email,password});if(error)throw error;el('authPassword').value='';if(create&&!data.session)showToast('Confira seu e-mail para confirmar a conta.');}
   catch(error){showToast(authMessage(error));}
 }
 async function deleteCloudData(){
   if(!currentUser||!confirm('Excluir definitivamente todos os seus registros da nuvem? Esta ação não pode ser desfeita.'))return;
   try{
     setSyncStatus('saving','Excluindo dados…');
-    const refs=[];
-    for(const group of ['days','prayers','weeks']){const snapshot=await getDocs(userCollection(group));snapshot.forEach(item=>refs.push(item.ref));}
-    refs.push(userDoc('settings','profile'));
-    for(let start=0;start<refs.length;start+=450){const batch=writeBatch(db);refs.slice(start,start+450).forEach(ref=>batch.delete(ref));await batch.commit();}
+    const {error}=await supabase.from('caminho_diario_records').delete().eq('user_id',currentUser.id);if(error)throw error;
     state=structuredClone(defaultState);saveState();refreshAll();showToast('Dados da nuvem excluídos.');
   }catch(error){handleSyncError(error);showToast('Não foi possível excluir os dados.');}
 }
-async function initializeFirebase(){
-  syncConfigured=firebaseReady();el('firebaseSetupNote').classList.toggle('hidden',syncConfigured);
+async function initializeSupabase(){
+  syncConfigured=supabaseReady();el('supabaseSetupNote').classList.toggle('hidden',syncConfigured);
   el('signInBtn').disabled=!syncConfigured;el('signUpBtn').disabled=!syncConfigured;
   if(!syncConfigured){setSyncStatus('local','Somente neste aparelho');return;}
   try{
-    const app=initializeApp(firebaseConfig);auth=getAuth(app);
-    try{db=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})});}
-    catch(error){console.warn('Cache persistente indisponível; usando cache da sessão.',error);db=getFirestore(app);}
-    onAuthStateChanged(auth,async user=>{
+    supabase=createClient(supabaseConfig.url,supabaseConfig.publishableKey);
+    supabase.auth.onAuthStateChange((event,session)=>{setTimeout(async()=>{
+      const user=session?.user||null;
       stopCloudListeners();currentUser=user;showAccount(user);
       if(!user){activeStorageKey=APP_KEY;state=loadState();refreshAll();setSyncStatus('local','Somente neste aparelho');return;}
       switchToUserStorage(user);
       try{await mergeAndMigrate();listenToCloud();showToast('Conta conectada e sincronização ativa.');}
       catch(error){handleSyncError(error);showToast('Conta conectada, mas a sincronização falhou.');}
-    });
-  }catch(error){handleSyncError(error);el('firebaseSetupNote').classList.remove('hidden');}
+    },0);});
+  }catch(error){handleSyncError(error);el('supabaseSetupNote').classList.remove('hidden');}
 }
 
 el('signInBtn').addEventListener('click',()=>submitAuth(false));
 el('signUpBtn').addEventListener('click',()=>submitAuth(true));
-el('signOutBtn').addEventListener('click',()=>signOut(auth));
+el('signOutBtn').addEventListener('click',()=>supabase.auth.signOut({scope:'local'}));
 el('syncNowBtn').addEventListener('click',async()=>{
   if(!navigator.onLine){showToast('Você está offline. As alterações permanecem na fila.');return;}
-  try{setSyncStatus('saving','Sincronizando…');await enableNetwork(db);await waitForPendingWrites(db);setSyncStatus('synced','Sincronizado');showToast('Sincronização concluída.');}catch(error){handleSyncError(error);}
+  try{await mergeAndMigrate();setSyncStatus('synced','Sincronizado');showToast('Sincronização concluída.');}catch(error){handleSyncError(error);}
 });
 el('deleteCloudBtn').addEventListener('click',deleteCloudData);
-window.addEventListener('online',()=>{if(currentUser){setSyncStatus('saving','Reconectando…');enableNetwork(db).catch(handleSyncError);}});
+window.addEventListener('online',()=>{if(currentUser){setSyncStatus('saving','Reconectando…');mergeAndMigrate().catch(handleSyncError);}});
 window.addEventListener('offline',()=>{if(currentUser)setSyncStatus('offline','Offline · alterações na fila');});
 
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;el('installBtn').classList.remove('hidden');});
@@ -333,4 +346,4 @@ if('serviceWorker' in navigator){
   });
 }
 
-loadHeader(); loadSettings(); loadDayForm(); renderDashboard(); renderPrayers(); initializeFirebase();
+loadHeader(); loadSettings(); loadDayForm(); renderDashboard(); renderPrayers(); initializeSupabase();
