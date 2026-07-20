@@ -57,7 +57,7 @@ export async function list(scope, kind = null) {
   const index = transaction.objectStore('records').index(kind ? 'scopeKind' : 'scope');
   const query = kind ? IDBKeyRange.only([scope, kind]) : IDBKeyRange.only(scope);
   const rows = await requestResult(index.getAll(query));
-  return rows.map(row => ({ kind: row.kind, id: row.id, payload: row.payload }));
+  return rows.map(row => ({ kind: row.kind, id: row.id, payload: row.payload, syncedRevision: row.syncedRevision || null }));
 }
 
 export async function set(scope, kind, id, payload, { enqueue = true } = {}) {
@@ -66,7 +66,7 @@ export async function set(scope, kind, id, payload, { enqueue = true } = {}) {
   const stores = enqueue ? ['records', 'outbox'] : ['records'];
   const transaction = db.transaction(stores, 'readwrite');
   const key = operationKey(scope, kind, id);
-  transaction.objectStore('records').put({ key, scope, kind, id, payload: normalized });
+  transaction.objectStore('records').put({ key, scope, kind, id, payload: normalized, syncedRevision: enqueue ? null : normalized.updatedAt });
   if (enqueue) transaction.objectStore('outbox').put({ key, scope, kind, id, type: 'upsert', payload: normalized, revision: normalized.updatedAt, attempts: 0, queuedAt: nowIso() });
   await transactionDone(transaction);
   return normalized;
@@ -106,10 +106,17 @@ export async function getPending(scope, kind, id) {
 
 export async function markSynced(key, revision) {
   const db = await openStorage();
-  const transaction = db.transaction('outbox', 'readwrite');
+  const transaction = db.transaction(['outbox', 'records'], 'readwrite');
   const store = transaction.objectStore('outbox');
   const current = await requestResult(store.get(key));
-  if (current?.revision === revision) store.delete(key);
+  if (current?.revision === revision) {
+    if (current.type === 'upsert') {
+      const records = transaction.objectStore('records');
+      const row = await requestResult(records.get(key));
+      if (row?.payload?.updatedAt === revision) records.put({ ...row, syncedRevision: revision });
+    }
+    store.delete(key);
+  }
   await transactionDone(transaction);
 }
 
@@ -197,6 +204,20 @@ export async function replaceScope(scope, nextState) {
   for (const payload of normalized.prayers) await set(scope, RECORD_KINDS.PRAYER, payload.id, payload);
   for (const [id, payload] of Object.entries(normalized.weeks)) await set(scope, RECORD_KINDS.WEEK, id, payload);
   return normalized;
+}
+
+export async function clearScope(scope) {
+  const db = await openStorage();
+  const transaction = db.transaction(['records', 'outbox'], 'readwrite');
+  const records = transaction.objectStore('records');
+  const outbox = transaction.objectStore('outbox');
+  const [recordRows, operationRows] = await Promise.all([
+    requestResult(records.index('scope').getAll(IDBKeyRange.only(scope))),
+    requestResult(outbox.index('scope').getAll(IDBKeyRange.only(scope)))
+  ]);
+  recordRows.forEach(row => records.delete(row.key));
+  operationRows.forEach(row => outbox.delete(row.key));
+  await transactionDone(transaction);
 }
 
 export async function mergeScope(scope, nextState) {

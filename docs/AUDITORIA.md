@@ -12,7 +12,16 @@ O modelo genérico `user_id + kind + record_id + payload` é suficiente para o p
 
 ## Crítico
 
-Nenhum segredo `service_role` ou chave privada foi encontrado. Nenhum defeito crítico comprovadamente destrutivo foi observado no estado auditado. Os itens de prioridade alta abaixo, entretanto, podem causar perda lógica ou reaparecimento de dados em concorrência e devem ser corrigidos antes de ampliar funcionalidades.
+Nenhum segredo `service_role` ou chave privada foi encontrado. Durante o teste de integração foi identificado o item crítico abaixo, corrigido na branch antes da entrega.
+
+### C1. Service worker podia armazenar respostas autenticadas
+
+- **Problema:** o handler de `fetch` anterior tentava cachear qualquer resposta GET com status 200, sem restringir origem ou destino.
+- **Impacto:** respostas REST autenticadas do Supabase poderiam ser gravadas no Cache Storage compartilhado pela origem e servidas fora do isolamento lógico esperado entre contas.
+- **Causa provável:** estratégia cache-first genérica aplicada também a tráfego de dados.
+- **Correção recomendada:** interceptar somente assets estáticos same-origin e o bundle público exato do SDK; nunca interceptar Auth, REST ou Realtime.
+- **Arquivos envolvidos:** `caminho-diario/service-worker.js`.
+- **Estado:** corrigido no cache `caminho-diario-v6`.
 
 ## Alto
 

@@ -32,14 +32,16 @@
           <h2><span id="progressCount">0</span> de 5 etapas</h2>
           <p id="progressMessage">Comece com calma. Fidelidade vale mais que pressa.</p>
         </div>
-        <div class="progress-ring" aria-label="Progresso diário">
-          <svg viewBox="0 0 120 120" role="img">
+        <div id="progressRing" class="progress-ring" role="progressbar" aria-label="Progresso diário" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <svg viewBox="0 0 120 120" aria-hidden="true">
             <circle class="ring-bg" cx="60" cy="60" r="50"></circle>
             <circle id="ringValue" class="ring-value" cx="60" cy="60" r="50"></circle>
           </svg>
           <strong id="progressPercent">0%</strong>
         </div>
       </article>
+
+      <button id="continueBtn" class="primary continue-button" type="button" data-focus="devotional">Continuar de onde parei</button>
 
       <div class="grid two">
         <article class="card task-card" data-task="devotional">
@@ -145,6 +147,7 @@
           <label class="checkline"><input id="doneReview" type="checkbox" /> Concluí a revisão da noite</label>
         </article>
 
+        <p id="draftStatus" class="muted save-status" role="status">As alterações são salvas automaticamente neste aparelho.</p>
         <button id="saveDailyBottom" class="primary large" type="button">Salvar registro do dia</button>
       </div>
     </section>
@@ -154,16 +157,32 @@
       <article class="form-card">
         <div class="grid two">
           <label>Nome<input id="prayerName" /></label>
-          <label>Categoria<select id="prayerCategory"><option>Família</option><option>Igreja</option><option>Enfermos</option><option>Afastados</option><option>Trabalho</option><option>Missões</option><option>Gratidão</option><option>Outro</option></select></label>
+          <label>Categoria<select id="prayerCategory"><option>Família</option><option>Igreja</option><option>Enfermos</option><option>Afastados</option><option>Trabalho</option><option>Missões</option><option>Gratidão</option><option>Pessoal</option><option>Outro</option></select></label>
         </div>
         <label>Motivo<textarea id="prayerReason" rows="3"></textarea></label>
         <button id="addPrayer" class="primary" type="button">Adicionar pedido</button>
       </article>
+      <div class="filter-bar" role="search" aria-label="Filtrar pedidos de oração">
+        <label>Buscar<input id="prayerSearch" type="search" placeholder="Nome ou motivo" /></label>
+        <label>Status<select id="prayerFilter"><option value="all">Todos</option><option value="active">Ativos</option><option value="answered">Respondidos</option><option value="archived">Arquivados</option></select></label>
+      </div>
       <div id="prayerList" class="stack"></div>
     </section>
 
     <section id="history" class="view">
-      <div class="section-title"><div><p class="eyebrow">MEMÓRIA DA CAMINHADA</p><h2>Histórico</h2></div><button id="exportBtn" class="secondary" type="button">Exportar backup</button></div>
+      <div class="section-title"><div><p class="eyebrow">MEMÓRIA DA CAMINHADA</p><h2>Histórico</h2></div><div class="item-actions"><button id="exportBtn" class="secondary" type="button">Exportar JSON</button><button id="printBtn" class="secondary" type="button">Imprimir / PDF</button></div></div>
+      <article class="form-card backup-tools">
+        <div class="filter-bar" role="search" aria-label="Filtrar histórico">
+          <label>Buscar<input id="historySearch" type="search" placeholder="Devocional, leitura ou prática" /></label>
+          <label>De<input id="historyFrom" type="date" /></label>
+          <label>Até<input id="historyTo" type="date" /></label>
+        </div>
+        <div class="filter-bar">
+          <label>Como importar<select id="importMode"><option value="merge">Mesclar versões mais recentes</option><option value="replace">Substituir dados locais</option></select></label>
+          <label class="file-label">Arquivo JSON<input id="importFile" type="file" accept="application/json,.json" /></label>
+        </div>
+        <p id="lastBackup" class="muted"></p>
+      </article>
       <div id="historyList" class="stack"></div>
     </section>
 
@@ -187,7 +206,7 @@
         <label>Horário da rotina da manhã<input id="morningTime" type="time" value="06:00" /></label>
         <label>Horário para lembrar a prática<input id="practiceTime" type="time" value="12:00" /></label>
         <label>Horário da revisão noturna<input id="reviewTime" type="time" value="21:30" /></label>
-        <label class="checkline"><input id="darkMode" type="checkbox" /> Usar modo escuro</label>
+        <label>Aparência<select id="themeMode"><option value="system">Seguir o sistema</option><option value="light">Modo claro</option><option value="dark">Modo escuro</option></select></label>
         <button id="saveSettings" class="primary" type="button">Salvar configurações</button>
       </article>
       <article class="form-card" id="accountCard">
@@ -220,14 +239,16 @@
   </main>
 
   <nav class="bottom-nav" aria-label="Navegação principal">
-    <button class="nav-btn active" data-view="dashboard">Hoje</button>
-    <button class="nav-btn" data-view="daily">Registro</button>
-    <button class="nav-btn" data-view="prayers">Oração</button>
-    <button class="nav-btn" data-view="history">Histórico</button>
-    <button class="nav-btn" data-view="weekly">Semana</button>
-    <button class="nav-btn" data-view="settings">Ajustes</button>
+    <button class="nav-btn active" data-view="dashboard" aria-controls="dashboard" aria-current="page">Hoje</button>
+    <button class="nav-btn" data-view="daily" aria-controls="daily">Registro</button>
+    <button class="nav-btn" data-view="prayers" aria-controls="prayers">Oração</button>
+    <button class="nav-btn" data-view="history" aria-controls="history">Histórico</button>
+    <button class="nav-btn" data-view="weekly" aria-controls="weekly">Semana</button>
+    <button class="nav-btn" data-view="settings" aria-controls="settings">Ajustes</button>
   </nav>
 
+  <div id="undoBar" class="action-bar hidden" role="status"><span id="undoMessage"></span><button id="undoDeleteBtn" class="secondary" type="button">Desfazer</button></div>
+  <div id="updateBar" class="action-bar hidden" role="status"><span>Uma nova versão está pronta.</span><button id="updateAppBtn" class="secondary" type="button">Atualizar aplicativo</button></div>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.7/dist/umd/supabase.min.js"></script>
   <script type="module" src="app.js"></script>
