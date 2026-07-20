@@ -446,10 +446,10 @@ function bindEvents() {
 }
 
 async function initializeApp() {
-  bindEvents();document.documentElement.dataset.appStage='storage';
-  try { await migrateLegacyStorage(APP_KEY, GUEST_SCOPE);document.documentElement.dataset.appStage='load';state = await loadState(GUEST_SCOPE); }
+  bindEvents();
+  try { await migrateLegacyStorage(APP_KEY, GUEST_SCOPE); state = await loadState(GUEST_SCOPE); }
   catch (error) { handleStorageError(error); try { state = validateBackup(JSON.parse(localStorage.getItem(APP_KEY) || '{}')); } catch { state = createDefaultState(); } }
-  document.documentElement.dataset.appStage='render';loadHeader(); loadSettings(); loadDayForm(); renderDashboard(); renderPrayers(); renderHistory(); renderWeekly(); updateBackupLabel();if(!navigator.onLine)setSyncStatus('offline','Offline · somente neste aparelho');setupServiceWorker();document.documentElement.dataset.appStage='supabase';await initializeSupabase();document.documentElement.dataset.appReady='true';
+  loadHeader(); loadSettings(); loadDayForm(); renderDashboard(); renderPrayers(); renderHistory(); renderWeekly(); updateBackupLabel(); if (!navigator.onLine) setSyncStatus('offline', 'Offline · somente neste aparelho'); setupServiceWorker(); await initializeSupabase(); document.documentElement.dataset.appReady = 'true';
 }
 
 initializeApp().catch(error => { handleStorageError(error); setSyncStatus('error', 'Falha ao iniciar'); });

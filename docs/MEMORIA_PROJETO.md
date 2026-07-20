@@ -2,6 +2,20 @@
 
 Última atualização: 2026-07-20
 
+## Auditoria geral — branch ativa
+
+- Branch de trabalho: `improvement/auditoria-geral`.
+- Checkpoint anterior às mudanças: `b72f600`.
+- Auditoria: `13d4f37`.
+- Camada modular/IndexedDB/testes: `c9d7469`.
+- Sincronização/PWA segura: `5a20ce5`.
+- Histórico e rotina ampliados: `6c26502`.
+- Documentação: `59e4502`.
+- CSP/SRI: `86f1288`.
+- A branch ainda não foi enviada nem mesclada em `main`.
+- `supabase.sql` revisado ainda precisa ser executado no projeto remoto.
+- Teste final headless passou com CSP/SRI, autosave IndexedDB, reload e abertura offline controlada pelo worker.
+
 ## Ponto de retomada
 
 O projeto é uma PWA estática, em HTML/CSS/JavaScript puro, voltada a uma rotina espiritual pessoal. A versão atual está no meio de uma migração não commitada de Firebase para Supabase. As lacunas locais de exclusão offline e carregamento offline do SDK foram corrigidas em 2026-07-20; não tratar a migração como concluída até validar o backend real em duas sessões/dispositivos.
@@ -65,7 +79,7 @@ Em 2026-07-20:
 
 ## Próximo passo recomendado
 
-Testar duas contas/sessões para isolamento RLS e realtime. Se passar, consolidar a migração em um commit e publicar; depois priorizar importação/restauração de backup e testes automatizados.
+Revisar `docs/RELATORIO-FINAL.md`, executar `supabase.sql` no projeto remoto, enviar a branch e testar duas contas/sessões após o deploy antes do merge definitivo em produção.
 
 ## Protocolo de atualização
 
