@@ -10,6 +10,7 @@ Branch atual: `main`.
 
 Últimos commits:
 
+- `23010d1` — migração da sincronização para Supabase, correções offline e agente de memória (preparado para publicação em 2026-07-20).
 - `956a343` — sincronização offline com Firebase.
 - `82a11ff` — preparação da PWA para GitHub Pages.
 
@@ -24,11 +25,12 @@ Branch atual: `main`.
 - Migração dos registros locais ao primeiro login e resolução de conflitos pelo registro mais recente.
 - Deploy do GitHub Pages publica diretamente `caminho-diario/`.
 
-## Alterações ainda não commitadas em 2026-07-20
+## Migração consolidada em 2026-07-20
 
+- Migração registrada no commit `23010d1`.
 - Modificados: `caminho-diario/README.md`, `app.js`, `index.html` e `service-worker.js`.
-- Removidos pela migração: `caminho-diario/firebase-config.js`, `firebase.json` e `firestore.rules`.
-- Novos: `caminho-diario/supabase-config.js` e `supabase.sql`.
+- Removidos: `caminho-diario/firebase-config.js`, `firebase.json` e `firestore.rules`.
+- Adicionados: `caminho-diario/supabase-config.js`, `supabase.sql`, `AGENTS.md`, agente customizado e esta memória.
 - O `package-lock.json` órfão foi removido; o projeto continua intencionalmente sem etapa de build.
 
 ## Implementado em 2026-07-20
@@ -58,9 +60,8 @@ Em 2026-07-20:
 ## Riscos e pendências prioritárias
 
 1. Falta concluir o isolamento RLS entre dois usuários, realtime em duas sessões e conflito de edição. Login, uso offline, persistência da fila, exclusão offline e reconexão já passaram.
-2. A migração inteira está fora de commit, portanto o checkpoint de código ainda é frágil.
-3. O backup só exporta; ainda não existe restauração/importação.
-4. A chave configurada no navegador é pública (`anon`/`publishable`) por design. A proteção depende das políticas RLS; nunca usar `service_role` no cliente.
+2. O backup só exporta; ainda não existe restauração/importação.
+3. A chave configurada no navegador é pública (`anon`/`publishable`) por design. A proteção depende das políticas RLS; nunca usar `service_role` no cliente.
 
 ## Próximo passo recomendado
 
